@@ -302,11 +302,18 @@ def process_match(
     match: MatchedMemory,
     media_dir: Path,
     force: bool,
+    skip_overlays: bool,
 ) -> tuple[dict[str, str], bool]:
     output_path = media_dir / output_filename(match)
     if output_path.exists() and not force:
         return (
-            manifest_row(match, output_path, "skipped", "Output already exists"),
+            manifest_row(
+                match,
+                output_path,
+                "skipped",
+                "Output already exists",
+                skip_overlays=skip_overlays,
+            ),
             False,
         )
 
@@ -314,7 +321,7 @@ def process_match(
         output_path.unlink()
 
     try:
-        if match.overlay:
+        if match.overlay and not skip_overlays:
             with tempfile.TemporaryDirectory(prefix="memoreasy-export-") as tmp:
                 tmp_dir = Path(tmp)
                 main_tmp = tmp_dir / Path(match.media.member_name).name
@@ -335,12 +342,30 @@ def process_match(
 
         date_str = match.metadata.date_utc.strftime(DATE_FORMAT)
         write_exif(output_path, date_str, match.metadata.lat, match.metadata.lon)
-        return (manifest_row(match, output_path, "created", ""), True)
+        return (
+            manifest_row(
+                match,
+                output_path,
+                "created",
+                "",
+                skip_overlays=skip_overlays,
+            ),
+            True,
+        )
 
     except Exception as error:
         if output_path.exists():
             output_path.unlink()
-        return (manifest_row(match, output_path, "failed", str(error)), False)
+        return (
+            manifest_row(
+                match,
+                output_path,
+                "failed",
+                str(error),
+                skip_overlays=skip_overlays,
+            ),
+            False,
+        )
 
 
 def manifest_row(
@@ -348,7 +373,12 @@ def manifest_row(
     output_path: Path,
     status: str,
     message: str,
+    skip_overlays: bool = False,
 ) -> dict[str, str]:
+    overlay_status = "yes" if match.overlay and not skip_overlays else "no"
+    if match.overlay and skip_overlays:
+        overlay_status = "skipped"
+
     return {
         "status": status,
         "output_file": str(output_path),
@@ -358,7 +388,7 @@ def manifest_row(
         "media_type": match.metadata.media_type,
         "latitude": match.metadata.lat,
         "longitude": match.metadata.lon,
-        "overlay_applied": "yes" if match.overlay else "no",
+        "overlay_applied": overlay_status,
         "matched_delta_seconds": str(match.matched_delta_seconds),
         "message": message,
     }
@@ -388,6 +418,7 @@ def run_export(args: argparse.Namespace) -> int:
         "metadata_rows": len(metadata_rows),
         "main_media_files": len(media_files),
         "overlay_files": len(overlays),
+        "skip_overlays": args.skip_overlays,
         "matched_media": len(matched),
         "missing_media_for_metadata_rows": len(missing_metadata),
         "unmatched_media_files": len(unmatched_media),
@@ -431,7 +462,12 @@ def run_export(args: argparse.Namespace) -> int:
             end="",
             flush=True,
         )
-        row, did_create = process_match(match, media_dir, args.force)
+        row, did_create = process_match(
+            match,
+            media_dir,
+            args.force,
+            args.skip_overlays,
+        )
         manifest_rows.append(row)
         if row["status"] == "failed":
             failed += 1
@@ -468,6 +504,7 @@ def print_summary(
     print(f"Metadata rows: {summary['metadata_rows']}")
     print(f"Main media files: {summary['main_media_files']}")
     print(f"Overlay files: {summary['overlay_files']}")
+    print(f"Skip overlays: {summary['skip_overlays']}")
     print(f"Matched media: {summary['matched_media']}")
     print(f"Missing media rows: {summary['missing_media_for_metadata_rows']}")
     print(f"Unmatched media files: {summary['unmatched_media_files']}")
@@ -481,9 +518,9 @@ def print_summary(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Process Snapchat's new split Memories export ZIPs into an "
-            "iPhone-ready media folder with timestamps, GPS metadata, and "
-            "overlay layers applied."
+            "Process Snapchat's new split Memories export ZIPs into a "
+            "photo-library-ready media folder with timestamps, GPS metadata, "
+            "and optional overlay layers applied."
         )
     )
     parser.add_argument(
@@ -505,6 +542,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Analyze and write reports without extracting or modifying media.",
+    )
+    parser.add_argument(
+        "--skip-overlays",
+        action="store_true",
+        help=(
+            "Do not merge Snapchat overlay PNGs. Extract base JPG/MP4 media "
+            "and write metadata only."
+        ),
     )
     parser.add_argument(
         "--limit",

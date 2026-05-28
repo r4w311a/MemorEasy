@@ -17,6 +17,7 @@ It will:
 - Read each Memory's date, time, media type, and GPS location from `json/memories_history.json`.
 - Match each photo or video to the correct metadata.
 - Merge Snapchat overlay PNG files back onto the matching photo or video when an overlay exists.
+- Optionally skip overlay merging and export only the base photos/videos with metadata.
 - Write correct date/time metadata into JPG and MP4 files.
 - Write GPS location metadata when Snapchat included it.
 - Set the file modified time to the Memory time.
@@ -303,6 +304,16 @@ Your ready files will be in:
 ```text
 /path/to/output/media
 ```
+
+### Can I export base photos and videos without overlays?
+
+Yes. Use `--skip-overlays` if you want the original base JPG/MP4 files with metadata written, but without Snapchat's overlay PNGs merged on top.
+
+```sh
+python process_export.py "/path/to/snapchat-zips/*.zip" --skip-overlays
+```
+
+This is useful if you want cleaner originals, or if you do not want stickers, captions, frames, or other overlay graphics burned into the exported media.
 
 ### Can I rerun it?
 

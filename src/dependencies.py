@@ -36,8 +36,7 @@ def find_dependency(dependency_str: str) -> str:
         return system_path
 
     raise DependencyError(
-        f"{dependency_str} not found. Please install {dependency_str} or"
-        "use the provided bundled executable."
+        f"{dependency_str} not found. Please install {dependency_str}. "
         "For further installation instructions, reference the README."
     )
 

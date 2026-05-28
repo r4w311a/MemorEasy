@@ -1,6 +1,8 @@
 # Project-relevant files
+.DS_Store
 memories_history.html
 memories/
+iphone_ready_memories/
 
 # Very important for making sure local exiftool implementation works
 !/bin/exiftool_files/lib/
